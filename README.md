@@ -1,2 +1,3 @@
 # sokoloid
-первый коммит в ветку bonus_0
+Sokolov Alexandr
+aesokolov1975@gmail.com
