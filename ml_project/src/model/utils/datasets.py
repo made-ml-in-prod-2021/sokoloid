@@ -2,20 +2,54 @@
 # -*- coding: UTF-8 -*-
 """"
 версия 1.0.1
+классы для работы со входными данными.
+для тренировки модели - набор маршрутав
 
 """
 
+import logging
 import numpy as np
 import pandas as pd
-import torch
-import torch.nn as nn
 from torch.utils import data
-from torchvision.models import resnet18
-from common_utils import GeoImage
-import tqdm
+
+from ml_project.src.model.utils.data_structures import GeoImage
+
+log = logging.getLogger(__name__)
+
+
+class QueryDataset(data.Dataset):
+    """
+    Датасет для обработки запросов в формате gps координат точек
+    """
+
+    def __init__(self, query_file_name, gps_to_pixel_transformer, pixel_to_tensor_transformer):
+        super(QueryDataset, self).__init__()
+        self.gps = []
+        self.gps_to_pixel_transformer = gps_to_pixel_transformer
+        self.to_tensor_transformer = pixel_to_tensor_transformer
+        log.info(f"Open query file {query_file_name}")
+        with open(query_file_name, "rt") as fin:
+            for line in fin:
+                self.gps.append(line.strip())
+            log.info(f" {len(self.gps)} lines read")
+
+    def __len__(self):
+        return len(self.gps)
+
+    def __getitem__(self, idx):
+        gps_coord = list(map(float, self.gps[idx].strip('[ ]\n').split(", ")))
+        pix_coord = self.gps_to_pixel_transformer(gps_coord)
+        return {"gps": self.gps[idx],
+                "pixels": pix_coord,
+                "tensor": self.to_tensor_transformer(pix_coord)
+                }
 
 
 class WalkLinesToDataset(data.Dataset):
+    """
+    Датасет для обучения модели. На преобразует маршруты по замельным участкам в последовательность изображений карты
+
+    """
     def __init__(self, image_file_name, walk_file_name, crop_size=16, walk_step=5, transforms=None):
         super(WalkLinesToDataset, self).__init__()
         self.transforms = transforms
@@ -60,7 +94,7 @@ class WalkLinesToDataset(data.Dataset):
         if self.transforms is not None:
             points = self.transforms(points)
         sample["image"] = self.map_image.get_rectangle(points["coord"],
-                                             self.rectangle_size)
+                                                       self.rectangle_size)
 
         sample["realcoord"] = points["coord"]
 
@@ -71,71 +105,3 @@ class WalkLinesToDataset(data.Dataset):
 
     def __len__(self):
         return len(self.targets)
-
-
-class TransformByKeys:
-    def __init__(self, transform, names):
-        self.transform = transform
-        self.names = set(names)
-
-    def __call__(self, sample):
-        for name in self.names:
-            if name in sample:
-                sample[name] = self.transform(sample[name])
-
-        return sample
-
-
-class RandomizeCoords:
-    def __init__(self, deviation=5):
-        self.deviation = deviation
-
-    def __call__(self, coord):
-        rand_offset = torch.randint(- self.deviation,
-                                    self.deviation,
-                                    (2,)).numpy()
-        return coord + rand_offset
-
-
-def train(model, loader, loss_fn, optimizer, scheduler,  device):
-    model.train()
-    train_loss = []
-    for batch in tqdm.tqdm(loader, total=len(loader), desc="training..."):
-        images = batch["image"].to(device)  # B x 3 x CROP_SIZE x CROP_SIZE
-        targets = batch["targets"]  # B x (2 * NUM_PTS)
-
-        pred_targets = model(images).cpu()  # B x 2
-        loss = loss_fn(pred_targets, targets)
-        train_loss.append(loss.item())
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        scheduler.step()
-
-    return np.mean(train_loss)
-
-
-def validate(model, loader, loss_fn, device):
-    model.eval()
-    val_loss = []
-    for batch in tqdm.tqdm(loader, total=len(loader), desc="validation...", position=0, leave=True):
-        images = batch["image"].to(device)
-        targets = batch["targets"]
-
-        with torch.no_grad():
-            pred_targets = model(images).cpu()
-        loss = loss_fn(pred_targets, targets)
-        val_loss.append(loss.item())
-
-    return np.mean(val_loss)
-
-
-def make_model(num_labels: int):
-    model = resnet18()
-    classifier = nn.Sequential(nn.Linear(model.fc.in_features, 512),
-                               nn.ReLU(),
-                               nn.Linear(512, num_labels),
-                               nn.LogSoftmax(dim=1))
-    model.fc = classifier
-    return model

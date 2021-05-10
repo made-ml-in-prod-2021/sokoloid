@@ -2,6 +2,8 @@
 # -*- coding: UTF-8 -*-
 """"
 версия 1.0.1
+улитита для тренировки модели
+
 
 """
 
@@ -12,30 +14,27 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import random_split
-from torchvision import transforms
 from PIL import Image
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 import hydra
-from train_utils import WalkLinesToDataset, TransformByKeys, RandomizeCoords, train, validate, make_model
+
+from ml_project.src.model.utils.transformers import TrainTransformer
+from ml_project.src.model.utils.train_utils import train, validate, make_model
+from ml_project.src.model.utils.datasets import WalkLinesToDataset
 
 log = logging.getLogger(__name__)
+
 
 @hydra.main(config_path="conf",
             config_name='train_config.yaml')
 def main(cfg: DictConfig) -> None:
     log.info("Start training")
-    norm_path = os.path.normpath(os.path.join(os.getcwd(), cfg.path_to_root))
+    root_path = os.path.normpath(os.path.join(hydra.utils.get_original_cwd(), cfg.path_to_root))
     Image.MAX_IMAGE_PIXELS = cfg.map.max_image_pixels
-    train_transforms = transforms.Compose([
-        TransformByKeys(RandomizeCoords(deviation=cfg.deviation), ("coord",)),
-        TransformByKeys(transforms.RandomHorizontalFlip(), ("image",)),
-        TransformByKeys(transforms.RandomVerticalFlip(), ("image",)),
+    train_transforms = TrainTransformer(cfg.deviation)
 
-        TransformByKeys(transforms.ToTensor(), ("image",)),
-        TransformByKeys(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]), ("image",)),
-    ])
-    walk_lines = WalkLinesToDataset(walk_file_name=os.path.join(norm_path, cfg.walks_file),
-                                    image_file_name=os.path.join(norm_path, cfg.map.map_image),
+    walk_lines = WalkLinesToDataset(walk_file_name=os.path.join(root_path, cfg.walks_file),
+                                    image_file_name=os.path.join(root_path, cfg.map.map_image),
                                     transforms=train_transforms,
                                     crop_size=cfg.crop_size,
                                     walk_step=cfg.walk_step)
@@ -53,9 +52,9 @@ def main(cfg: DictConfig) -> None:
     optimizer = optim.AdamW(model.parameters(), lr=cfg.lr, )
     loss_fn = nn.NLLLoss().to(device)
     scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=cfg.lr,
-                                              steps_per_epoch=int(len(train_data_loader)),
-                                              epochs=cfg.epoch,
-                                              anneal_strategy='linear')
+                                                    steps_per_epoch=int(len(train_data_loader)),
+                                                    epochs=cfg.epoch,
+                                                    anneal_strategy='linear')
 
     # 2. train & validate
     log.info("Ready for training...")
@@ -67,7 +66,7 @@ def main(cfg: DictConfig) -> None:
         log.info("Epoch #{:2}:\ttrain loss: {:5.2}\tval loss: {:5.2}".format(epoch, train_loss, val_loss))
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            torch.save(model, os.path.join(norm_path, cfg.model_save))
+            torch.save(model, os.path.join(root_path, cfg.model_save))
 
     log.info(f"best val is  {best_val_loss}")
     return 0

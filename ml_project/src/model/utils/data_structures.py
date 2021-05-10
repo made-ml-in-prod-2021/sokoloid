@@ -2,9 +2,12 @@
 # -*- coding: UTF-8 -*-
 """"
 версия 1.0.1
-классы для работы с данными
+набор классов для конфигурации приложения
+
+
 """
-import os
+from dataclasses import dataclass
+from omegaconf import DictConfig, MISSING
 from PIL import Image, ImageDraw
 import numpy as np
 import logging
@@ -58,52 +61,34 @@ class GeoImage:
 
         im_crop.save(file_name)
 
-
-class GpsToPixelTransformer:
-    '''
-    трансформер для преобразования коррдинат GPS в пиксели
-
-    '''
-
-    def __init__(self, gps_coord=None, pixels_coord=None):
-        # матрица линейных преобразований координат
-        self.rotate_matrix = None
-        if gps_coord is not None and pixels_coord is not None:
-            self.fit(gps_coord, pixels_coord)
-
-    def fit(self, gps_coord, pixels_coord):
-        """
-        формирование матрицы преобразований
-        :param pixels_coord: координанты 3х точек pixels numpy.array  shape (3, 2)
-        :param gps_coord: координанты 3х точек GPS numpy.array  shape (3, 2)   dtype=np.float64
-
-        :return:
-        """
-
-        gps = np.ones((3, 3), dtype=np.float64)
-        gps[:, [0, 1]] = gps_coord
-
-        pixels = np.ones((3, 3), dtype=np.float64)
-        pixels[:, [0, 1]] = pixels_coord
-
-        self.rotate_matrix = np.linalg.inv(gps) @ pixels
-
-    def transform(self, gps_coord: np.array):
-        """
-        преобразование координат. на входе  GPS numpy.array  shape ( N, 2)
-        :param gps_coord: GPS numpy.array  shape (2,)
-
-        :return:  pixels numpy.array  shape (2,)
-        """
-
-        coord = np.ones((3,), dtype=np.float64)
-
-        coord[[0, 1]] = gps_coord
-        transformed = coord.reshape((1, 3)) @ self.rotate_matrix
-        return transformed[0, [0, 1]].astype(np.int)
+@dataclass
+class MapConfig(DictConfig):
+    map_image: str = MISSING
+    model_pkl: str = MISSING
+    max_image_pixels: int = MISSING
+    gps_coord: list = MISSING
+    pixel_coord: list = MISSING
+    crop_size: int = MISSING
+    class_list: dict = MISSING
 
 
-def norm_file_path(file_path, norm_path):
-    if not os.path.isabs(os.path.dirname(file_path)):
-        file_path = os.path.join(norm_path, file_path)
-    return file_path
+@dataclass
+class Config(DictConfig):
+    input: str = "input.csv"
+    output: str = "output.csv"
+    debug: bool = False
+    debug_crop_size: int = 128
+    debug_image_dir: str = "c:/temp"
+    batch_size: int = 512
+    threshold: float = 0.95
+    # путь к корневому каталогу ПРОГРАММЫ
+    path_to_root: str = MISSING
+    map: MapConfig = MISSING
+
+
+@dataclass
+class PredictResult:
+    coord: tuple = (0, 0)
+    target: int = 0
+    predict: int = 0
+    score: float = 0

@@ -22,49 +22,16 @@ import functools
 import operator
 import numpy as np
 import torch
-from torchvision import transforms
-from torch.utils import data
 from PIL import Image
-from omegaconf import DictConfig, MISSING
 import hydra
-from dataclasses import dataclass
 import tqdm
 
-from common_utils import GeoImage, GpsToPixelTransformer, norm_file_path
+from ml_project.src.model.utils.common_utils import GeoImage, norm_file_path
+from ml_project.src.model.utils.transformers import GeoTransformer, GpsToPixelTransformer
+from ml_project.src.model.utils.datasets import QueryDataset
+from ml_project.src.model.utils.data_structures import Config
 
 log = logging.getLogger(__name__)
-
-
-def get_transformer(image_map: GeoImage):
-    transformer = transforms.Compose([
-        image_map.get_rectangle,
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
-    return transformer
-
-
-class QueryDataset(data.Dataset):
-    def __init__(self, query_file_name, gps_to_pixel_transformer, pixel_to_tensor_transformer):
-        self.gps = []
-        self.gps_to_pixel_transformer = gps_to_pixel_transformer
-        self.to_tensor_transformer = pixel_to_tensor_transformer
-        log.info(f"Open query file {query_file_name}")
-        with open(query_file_name, "rt") as fin:
-            for line in fin:
-                self.gps.append(line.strip())
-            log.info(f" {len(self.gps)} lines read")
-
-    def __len__(self):
-        return len(self.gps)
-
-    def __getitem__(self, idx):
-        gps_coord = list(map(float, self.gps[idx].strip('[ ]\n').split(", ")))
-        pix_coord = self.gps_to_pixel_transformer(gps_coord)
-        return {"gps": self.gps[idx],
-                "pixels": pix_coord,
-                "tensor": self.to_tensor_transformer(pix_coord)
-                }
 
 
 def predict_area_class(model, data_loader, cfg):
@@ -125,48 +92,23 @@ def write_predict_w_description(output_file_name: str,
         log.info(f" saved {cnt} records")
 
 
-@dataclass
-class MapConfig(DictConfig):
-    map_image: str = MISSING
-    model_pkl: str = MISSING
-    max_image_pixels: int = MISSING
-    gps_coord: list = MISSING
-    pixel_coord: list = MISSING
-    crop_size: int = MISSING
-    class_list: dict = MISSING
-
-
-@dataclass
-class Config(DictConfig):
-    input: str = "input.csv"
-    output: str = "output.csv"
-    debug: bool = False
-    debug_crop_size: int = 128
-    debug_image_dir: str = "c:/temp"
-    batch_size: int = 512
-    threshold: float = 0.95
-    # путь к корневому каталогу ПРОГРАММЫ
-    path_to_root: str = MISSING
-    map: MapConfig = MISSING
-
-
 @hydra.main(config_path="conf",
             config_name="config.yaml")
 def main(cfg: Config) -> None:
     log.info(f"Start")
-    norm_path = os.path.normpath(os.path.join(os.getcwd(), cfg.path_to_root))
-    input_file = norm_file_path(cfg.input, norm_path)
-    output_file = norm_file_path(cfg.output, norm_path)
+    root_path = os.path.normpath(os.path.join(hydra.utils.get_original_cwd(), cfg.path_to_root))
+    input_file = norm_file_path(cfg.input, root_path)
+    output_file = norm_file_path(cfg.output, root_path)
 
     Image.MAX_IMAGE_PIXELS = max(Image.MAX_IMAGE_PIXELS, cfg.map.max_image_pixels)
-    geo_map = GeoImage(os.path.join(norm_path, cfg.map.map_image), cfg.map.crop_size)
+    geo_map = GeoImage(os.path.join(root_path, cfg.map.map_image), cfg.map.crop_size)
 
     gps_to_pixel = GpsToPixelTransformer(np.array(cfg.map.gps_coord),
                                          np.array(cfg.map.pixel_coord))
 
-    to_tensor_transformer = get_transformer(geo_map)
+    to_tensor_transformer = GeoTransformer(geo_map)
     log.info(f"Loading  model {cfg.map.model_pkl}")
-    model = torch.load(os.path.join(norm_path, cfg.map.model_pkl))
+    model = torch.load(os.path.join(root_path, cfg.map.model_pkl))
     model.eval()
 
     query_dataset = QueryDataset(input_file,

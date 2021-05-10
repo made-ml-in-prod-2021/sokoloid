@@ -1,7 +1,7 @@
 defaults:
   - map: kazan_cfg.yaml
 
-path_to_root: ../../../../..
+path_to_root: ../../
 debug_crop_size: 128
 debug_image_dir: c:/temp/
 save_miclassified_images: 10

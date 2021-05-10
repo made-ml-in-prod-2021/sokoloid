@@ -11,25 +11,18 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import random_split
-from torchvision import transforms
+
 from PIL import Image
 from omegaconf import DictConfig
 import hydra
-from dataclasses import dataclass
-from train_utils import WalkLinesToDataset, TransformByKeys, RandomizeCoords
-from common_utils import norm_file_path
+from ml_project.src.model.utils.datasets import WalkLinesToDataset
+from ml_project.src.model.utils.common_utils import norm_file_path
+from ml_project.src.model.utils.transformers import ValidateTransformer
+from ml_project.src.model.utils.data_structures import PredictResult
 import tqdm
 from collections import defaultdict
 
 log = logging.getLogger(__name__)
-
-
-@dataclass
-class PredictResult:
-    coord: tuple = (0, 0)
-    target: int = 0
-    predict: int = 0
-    score: float = 0
 
 
 def save_images(results,
@@ -61,17 +54,13 @@ def save_images(results,
             config_path="conf", )
 def main(cfg: DictConfig) -> None:
     log.info("Start scoring")
-    norm_path = os.path.normpath(os.path.join(os.getcwd(), cfg.path_to_root))
+    root_path = os.path.normpath(os.path.join(hydra.utils.get_original_cwd(), cfg.path_to_root))
     Image.MAX_IMAGE_PIXELS = cfg.map.max_image_pixels
-    train_transforms = transforms.Compose([
-        TransformByKeys(RandomizeCoords(deviation=cfg.deviation), ("coord",)),
-        TransformByKeys(transforms.ToTensor(), ("image",)),
-        TransformByKeys(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]), ("image",)),
-    ])
+    train_transforms = ValidateTransformer(cfg.deviation)
     Image.MAX_IMAGE_PIXELS = max(Image.MAX_IMAGE_PIXELS, cfg.map.max_image_pixels)
-    log.info(f"Try to load path database {os.path.join(norm_path, cfg.walks_file)}")
-    walk_lines = WalkLinesToDataset(walk_file_name=os.path.join(norm_path, cfg.walks_file),
-                                    image_file_name=os.path.join(norm_path, cfg.map.map_image),
+    log.info(f"Try to load path database {os.path.join(root_path, cfg.walks_file)}")
+    walk_lines = WalkLinesToDataset(walk_file_name=os.path.join(root_path, cfg.walks_file),
+                                    image_file_name=os.path.join(root_path, cfg.map.map_image),
                                     transforms=train_transforms,
                                     crop_size=cfg.map.crop_size,
                                     walk_step=cfg.walk_step)
@@ -80,7 +69,7 @@ def main(cfg: DictConfig) -> None:
 
     val_data_loader = torch.utils.data.DataLoader(walk_lines, batch_size=1, shuffle=False)
 
-    model = torch.load(os.path.join(norm_path, cfg.map.model_pkl))
+    model = torch.load(os.path.join(root_path, cfg.map.model_pkl))
     loss_fn = nn.NLLLoss()
 
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
@@ -106,14 +95,14 @@ def main(cfg: DictConfig) -> None:
                 save_wrong_classified=True,
                 top_cnt=cfg.save_miclassified_images,
                 cfg=cfg,
-                save_dir=norm_file_path(cfg.debug_image_dir, norm_path))
+                save_dir=norm_file_path(cfg.debug_image_dir, root_path))
 
     save_images(results,
                 walk_lines,
                 save_wrong_classified=False,
                 top_cnt=cfg.save_miclassified_images,
                 cfg=cfg,
-                save_dir=norm_file_path(cfg.debug_image_dir, norm_path))
+                save_dir=norm_file_path(cfg.debug_image_dir, root_path))
 
     mismatch_cnt = 0
     mismatch_map = defaultdict(int)

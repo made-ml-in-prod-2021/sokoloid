@@ -1,7 +1,6 @@
 import pytest
 import numpy as np
-from common_utils import GpsToPixelTransformer
-
+from ml_project.src.model.utils.transformers import GpsToPixelTransformer
 
 def test_gps_to_pix_transformer():
     transformer = GpsToPixelTransformer()
