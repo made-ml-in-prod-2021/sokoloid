@@ -18,75 +18,51 @@
 
 import os.path
 import logging
-import functools
-import operator
+
 import numpy as np
 import torch
 from PIL import Image
 import hydra
-import tqdm
 
-from ml_project.src.model.utils.common_utils import GeoImage, norm_file_path
-from ml_project.src.model.utils.transformers import GeoTransformer, GpsToPixelTransformer
-from ml_project.src.model.utils.datasets import QueryDataset
-from ml_project.src.model.utils.data_structures import Config
+from utils.common_utils import norm_file_path
+from utils.transformers import GeoTransformer, GpsToPixelTransformer
+from utils.datasets import QueryDataset
+from utils.data_structures import Config, GeoImage
+from utils.common_utils import batch_predict_area_class, description_iterator
 
 log = logging.getLogger(__name__)
-
-
-def predict_area_class(model, data_loader, cfg):
-    gps = []
-    pixels = []
-    predicts = []
-    log.info(f"Ready to predict for {len(data_loader)} batches")
-    for batch in tqdm.tqdm(data_loader,
-                           total=len(data_loader), desc="recognizing...",
-                           position=0, unit="points", unit_scale=cfg.batch_size,
-                           leave=True):
-        with torch.no_grad():
-            predicts.append(model(batch["tensor"]).cpu().numpy())
-            gps.append(batch["gps"])
-            pixels.append(batch["pixels"].numpy())
-    gps = functools.reduce(operator.iconcat, gps, [])
-    pixels = np.concatenate(pixels, axis=0)
-    predicts = np.concatenate(predicts, axis=0)
-    log.info(f"  {len(gps)} records processed")
-    return gps, pixels, predicts
 
 
 def write_predict_w_description(output_file_name: str,
                                 prediction_results: tuple,
                                 cfg,
                                 geo_map):
-    gps_list, pixels_arr, predicts_arr = prediction_results
-    sorted_class_ids_list = np.argsort(predicts_arr, axis=1)
-    class_dict = {int(k): cfg.map.class_list[k] for k in cfg.map.class_list}
-    log.info(f" Try to save to   {output_file_name} file")
+    """
+    сохраниет результат работы в файл
+    :param output_file_name:
+    :param prediction_results:
+    :param cfg:
+    :param geo_map: объект - изображение карты
+    :return:
+    """
     cnt = 0
-    with open(output_file_name, "wt") as fout:
-        for gps, pixels, sorted_class_ids, predict in zip(gps_list,
-                                                          pixels_arr,
-                                                          sorted_class_ids_list,
-                                                          predicts_arr):
-            prob = np.exp(-predict[sorted_class_ids[-1]])
-            predicted_class1 = sorted_class_ids[-1]
-            predicted_class2 = sorted_class_ids[-2]
-            if prob > cfg.threshold:
-                description = f"{class_dict[predicted_class1]}"
-            else:
-                description = f"{class_dict[predicted_class1]}_or_{class_dict[predicted_class2]}"
+    log.info(f" Try to save to   {output_file_name} file")
+    with open(output_file_name, "wt", encoding="utf-8") as fout:
+        for point_w_description in description_iterator(prediction_results, cfg, geo_map):
 
-            fout.write(f"{gps};{pixels[0]};{pixels[1]};{description}\n")
+            fout.write(f"{point_w_description.gps};"
+                       f"{point_w_description.coord[0]};{point_w_description.coord[1]};"
+                       f"{point_w_description.description}\n")
             cnt += 1
             if cfg.debug:
-                file_name = f"img_{gps.replace('.', '_')}" \
-                            f"_x{pixels[0]}-y{pixels[1]}" \
-                            f"_{round(100 * prob)}_" \
-                            f"_{predicted_class1}" \
-                            f"_{predicted_class2}_.jpg"
+                file_name = f"img_{point_w_description.gps.replace('.', '_')}" \
+                            f"_x{point_w_description.coord[0]}-y{point_w_description.coord[1]}" \
+                            f"_{round(100 * point_w_description.probability)}_" \
+                            f"_{point_w_description.description}" \
+                            f"_.jpg"
                 file_name = os.path.join(cfg.debug_image_dir, file_name)
                 geo_map.save_debug_image(file_name,
-                                         pixels,
+                                         point_w_description.coord,
                                          crop_size=cfg.debug_crop_size,
                                          analyzed_area=cfg.map.crop_size)
         log.info(f" saved {cnt} records")
@@ -121,7 +97,7 @@ def main(cfg: Config) -> None:
                                                     shuffle=False,
                                                     drop_last=False)
 
-    prediction_results = predict_area_class(model, query_data_loader, cfg)
+    prediction_results = batch_predict_area_class(model, query_data_loader, cfg)
 
     write_predict_w_description(output_file, prediction_results, cfg, geo_map)
     log.info("End processing data")

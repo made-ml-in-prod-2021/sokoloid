@@ -1,9 +1,16 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
 """"
-версия 1.0.1
-улитита для тренировки модели
+версия 6.0.1
 
+train.py -утилита для тренировки модели на основе resnet18.
+В качестве входных данных подается набор маршрутов, проходящих по территории одного класса.
+Маршрут задается набором координат точек. Формат - csv
+пример:
+class x1 y1 x2 y2 x3 y3 x4 y4 x5 y5 x6 y6 x7 y7 x8 y8 x9 y9 x10 y10
+0 16227 13054 16300 13017 16286 12929 16117 12904 16105 13024
+0 15830 12909
+1 19043 11043 18991 11038 19064 10836 19090 10836 19150 10962 19140 10990
 
 """
 
@@ -18,9 +25,9 @@ from PIL import Image
 from omegaconf import DictConfig
 import hydra
 
-from ml_project.src.model.utils.transformers import TrainTransformer
-from ml_project.src.model.utils.train_utils import train, validate, make_model
-from ml_project.src.model.utils.datasets import WalkLinesToDataset
+from utils.transformers import TrainTransformer
+from utils.train_utils import train, validate, make_model
+from utils.datasets import WalkLinesToDataset
 
 log = logging.getLogger(__name__)
 

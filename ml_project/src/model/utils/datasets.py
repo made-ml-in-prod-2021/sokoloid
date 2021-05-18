@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from torch.utils import data
 
-from ml_project.src.model.utils.data_structures import GeoImage
+from utils.data_structures import GeoImage
 
 log = logging.getLogger(__name__)
 

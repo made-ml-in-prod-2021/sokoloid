@@ -1,7 +1,16 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
 """"
-версия 1.0.1
+версия 6.1.0
+sort_images.py утилита для проверки правильности классификации.
+На вход получат так же как и train.py файл с маршрутами, проходящих по территории одного класса.
+Маршрут задается набором координат точек. Формат - csv
+class x1 y1 x2 y2 x3 y3 x4 y4 x5 y5 x6 y6 x7 y7 x8 y8 x9 y9 x10 y10
+0 16227 13054 16300 13017 16286 12929 16117 12904 16105 13024
+0 15830 12909
+1 19043 11043 18991 11038 19064 10836 19090 10836 19150 10962 19140 10990
+подсчитывает количество неправильных классификация и разбивкой по парам (target-predit) .
+Так же может в целях отладки сохранять изображение окрестностей точек, для которой проводилась классификация
 
 """
 
@@ -15,10 +24,10 @@ from torch.utils.data import random_split
 from PIL import Image
 from omegaconf import DictConfig
 import hydra
-from ml_project.src.model.utils.datasets import WalkLinesToDataset
-from ml_project.src.model.utils.common_utils import norm_file_path
-from ml_project.src.model.utils.transformers import ValidateTransformer
-from ml_project.src.model.utils.data_structures import PredictResult
+from utils.datasets import WalkLinesToDataset
+from utils.common_utils import norm_file_path
+from utils.transformers import ValidateTransformer
+from utils.data_structures import PredictResult
 import tqdm
 from collections import defaultdict
 
@@ -40,8 +49,7 @@ def save_images(results,
                               f"_pecent_x{res.coord[0]}_y{res.coord[1]}.jpg"
             walk_lines.map_image.save_debug_image(os.path.join(save_dir, image_file_name),
                                                   res.coord,
-                                                  crop_size=cfg.debug_crop_size,
-                                                  analyzed_area=cfg.map.crop_size)
+                                                  crop_size=cfg.debug_crop_size)
 
             if image_count == top_cnt:
                 break
