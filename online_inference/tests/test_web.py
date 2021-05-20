@@ -7,7 +7,6 @@
 import pytest
 
 from fastapi.testclient import TestClient
-import time
 
 from app_fast_api import app
 
