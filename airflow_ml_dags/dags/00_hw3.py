@@ -17,7 +17,7 @@ with DAG(
     make_data = DockerOperator(
         task_id = "Generate_data",
         image = "hw03-make-data",
-        command = "/data/raw/{{ ds }}",
+        command = "python make_data.py /data/raw/{{ ds }}",
         network_mode = "bridge",
         do_xcom_push = False,
         volumes = [VOLUME],
