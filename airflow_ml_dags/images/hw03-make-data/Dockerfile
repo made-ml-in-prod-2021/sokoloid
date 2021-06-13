@@ -1,5 +1,4 @@
-FROM apache/airflow:2.0.0-python3.6
-RUN pip install --user --no-cache-dir sklearn
+FROM airflow-ml-base:latest
 
 COPY make_data.py /make_data.py
 
