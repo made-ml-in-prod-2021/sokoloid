@@ -26,13 +26,12 @@ def make_data(input_dir: str, output_dir: str):
 
     arrays = train_test_split(x_data, y_data, train_size=SPLIT_RATIO)
 
-    fine_names = [TRAIN_X_FILENAME,
-                  TRAIN_Y_FILENAME,
+    file_names = [TRAIN_X_FILENAME,
                   TEST_X_FILENAME,
+                  TRAIN_Y_FILENAME,
                   TEST_Y_FILENAME]
 
-    os.makedirs(output_dir, exist_ok=True)
-    for file_name, array in zip(fine_names, arrays):
+    for file_name, array in zip(file_names, arrays):
         with open(os.path.join(output_dir, file_name), "wt") as f_out:
             np.savetxt(f_out, array, delimiter=",")
 

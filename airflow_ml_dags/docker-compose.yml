@@ -9,6 +9,10 @@ x-environment: &airflow_environment
   - AIRFLOW__CORE__STORE_SERIALIZED_DAGS=True
   - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
   - AIRFLOW__CORE__FERNET_KEY=${FERNET_KEY}
+  - AIRFLOW__SMTP__SMTP_HOST=smtp.gmail.com
+  - AIRFLOW__SMTP__SMTP_PORT=587
+  - AIRFLOW__SMTP__SMTP_USER=${MAIL_USER}
+  - AIRFLOW__SMTP__SMTP_PASSWORD=${MAIL_PASSWD}
 
 
 x-airflow-image: &airflow_image apache/airflow:2.0.0-python3.6
@@ -83,25 +87,38 @@ services:
     restart: "no"
 
 
-
-
-   # predict:
-    #build:
-    #  context: images/airflow-predict
-    #image: airflow-predict
-    #restart: "no"
-
-    #download:
-    #build:
-    #  context: images/airflow-download
-    #image: airflow-download
-    #restart: "no"
-
-    #preprocess:
-    #build:
-    #  context: images/airflow-preprocess
-    #image: airflow-preprocess
+  hw03-convert-data:
+    build:
+      context: images/hw03-convert-data
+    image: hw03-convert-data
     restart: "no"
+
+  hw03-split-data:
+    build:
+      context: images/hw03-split-data
+    image: hw03-split-data
+    restart: "no"
+
+  hw03-train:
+    build:
+      context: images/hw03-train
+    image: hw03-train
+    restart: "no"
+
+  hw03-validate:
+    build:
+      context: images/hw03-validate
+    image: hw03-validate
+    restart: "no"
+
+  hw03-predict:
+    build:
+      context: images/hw03-predict
+    image: hw03-predict
+    restart: "no"
+
+
+
 
 volumes:
   logs:

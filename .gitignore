@@ -5,3 +5,8 @@
 /online_inference/data/raw/
 /online_inference/model/
 /online_inference/reports/
+/airflow_ml_dags/data/model/
+/airflow_ml_dags/data/predictions/
+/airflow_ml_dags/data/processed/
+/airflow_ml_dags/data/raw/
+/airflow_ml_dags/dags/__pycache__

@@ -1,85 +1,78 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
+import os
 
 from airflow import DAG
-from airflow.models import Variable
 from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.sensors.filesystem import FileSensor
 from airflow.utils.dates import days_ago
 
-LOCAL_DATA_DIR = "/tmp/data/"
-LOCAL_DATA_PATH = LOCAL_DATA_DIR + "{{ ds }}"
+AIRFLOW_DATA_PATH = "/home/sokolov/prod/sokoloid/airflow_ml_dags/data/"
 
-# AIRFLOW_RAW_DATA_PATH = "/opt/airflow/data/raw/{{ ds }}"
-# HOST_RAW_DATA_PATH = "/data/raw/{{ ds }}"
-# HOST_PROCESSED_DATA_PATH = "/data/processed/{{ ds }}"
-# HOST_SPLITTED_DATA_PATH = "/data/splitted/{{ ds }}"
-# HOST_MODELS_PATH = "/data/models/{{ ds }}"
-
-HOST_DATA_DIR = Variable.get("HOST_DATA_DIR")
-
-default_args = {
-    "owner": "airflow",
-    "email": ["airflow@example.com"],
-    "retries": 1,
-    "retry_delay": timedelta(minutes=5),
-}
-
+default_args = {'owner': 'airflow',
+                'start_date': datetime(2018, 1, 30),
+                'email': ['aesokolov1975@gmail.com'],
+                'email_on_failure': True,
+                'email_on_retry': True,
+                'retry_exponential_backoff': True,
+                'retry_delay': timedelta(seconds=300),
+                'retries': 3
+                }
 with DAG(
-        task_id="Train model",
+        dag_id="00_HW3_02_train_validate",
         default_args=default_args,
         schedule_interval="@weekly",
         start_date=days_ago(14),
 ) as dag:
     wait_train_data = FileSensor(
         task_id="wait-for-train-data",
-        filepath=f"{LOCAL_DATA_PATH}/data.csv",
+        filepath="data/raw/{{ ds }}/data.csv",
         poke_interval=30,
     )
 
     wait_train_target = FileSensor(
         task_id="wait-for-train-target",
-        filepath=f"{LOCAL_DATA_PATH}/target.csv",
+        filepath="data/raw/{{ ds }}/target.csv",
         poke_interval=30,
     )
 
-    preprocess = DockerOperator(
-        image="airflow-preprocess",
-        command=f"--input_dir {HOST_RAW_DATA_PATH} --output_dir {HOST_PROCESSED_DATA_PATH}",
+    convert_data = DockerOperator(
+        task_id="convert-data",
+        image="hw03-convert-data",
+        command="--input_dir /data/raw/{{ ds }} --output_dir /data/processed/{{ds}}",
         network_mode="bridge",
-        task_id="docker-airflow-preprocess-train-data",
         do_xcom_push=False,
         auto_remove=True,
-        volumes=[f"{HOST_DATA_DIR}:/data"],
+        volumes=[f"{AIRFLOW_DATA_PATH}:/data"],
     )
 
-    split = DockerOperator(
-        image="airflow-split",
-        command=f"--input_dir {HOST_PROCESSED_DATA_PATH} --output_dir {HOST_SPLITTED_DATA_PATH}",
+    split_data = DockerOperator(
+        task_id="split-data",
+        image="hw03-split-data",
+        command="--input_dir /data/processed/{{ ds }} --output_dir /data/processed/{{ds}}",
         network_mode="bridge",
-        task_id="docker-airflow-split-train-data",
         do_xcom_push=False,
         auto_remove=True,
-        volumes=[f"{HOST_DATA_DIR}:/data"],
+        volumes=[f"{AIRFLOW_DATA_PATH}:/data"],
     )
 
     train = DockerOperator(
-        image="airflow-train",
-        command=f"--input_dir {HOST_SPLITTED_DATA_PATH} --models_dir {HOST_MODELS_PATH}",
+        task_id="train",
+        image="hw03-train",
+        command="--input_dir /data/processed/{{ ds }} --output_dir /data/model/{{ds}} ",
         network_mode="bridge",
-        task_id="docker-airflow-train-model",
         do_xcom_push=False,
         auto_remove=True,
-        volumes=[f"{HOST_DATA_DIR}:/data"],
+        volumes=[f"{AIRFLOW_DATA_PATH}:/data"],
     )
 
     validate = DockerOperator(
-        image="airflow-validate",
-        command=f"--input_dir {HOST_SPLITTED_DATA_PATH} --models_dir {HOST_MODELS_PATH}",
+        task_id="validate",
+        image="hw03-validate",
+        command="--input_dir /data/processed/{{ ds }} --model_dir /data/model/{{ds}}, ",
         network_mode="bridge",
-        task_id="docker-airflow-validate-model",
         do_xcom_push=False,
         auto_remove=True,
-        volumes=[f"{HOST_DATA_DIR}:/data"],
+        volumes=[f"{AIRFLOW_DATA_PATH}:/data"],
     )
 
-    [wait_train_data, wait_train_target] >> preprocess >> split >> train >> validate
+    [wait_train_data, wait_train_target] >> convert_data >> split_data >> train >> validate
