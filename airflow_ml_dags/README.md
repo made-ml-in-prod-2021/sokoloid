@@ -7,7 +7,7 @@ cd sokoloid
 git checkout homework3
 cd airflow_ml_dags
 ```
-##запуск
+## запуск
 для отправки повещений по электронной почте необходимо 
 указать данные учетной записи и разрешить в соотвествующем  аккануте подключение с ногово устройства
 ```
@@ -16,9 +16,15 @@ export MAIL_USER=aesokolov1975@gmail.com
 export MAIL_PASSWD=*********
 sudo -E docker-compose up --build
 ```
-##Фотографии работы 
+## Фотографии работы 
 
-будут
+ 1
+ ![2](https://user-images.githubusercontent.com/46603429/121949114-c6c0a300-cd60-11eb-82ac-6e0c872dd578.png)
+2![3](https://user-images.githubusercontent.com/46603429/121949133-cb855700-cd60-11eb-9f15-a2748323a97c.png)
+3![5](https://user-images.githubusercontent.com/46603429/121949152-d344fb80-cd60-11eb-9efb-cb410c2f3a88.png)
+4![6](https://user-images.githubusercontent.com/46603429/121949165-d63fec00-cd60-11eb-9772-b83947bac998.png)
+5![7](https://user-images.githubusercontent.com/46603429/121949209-dd66fa00-cd60-11eb-8080-708891736b4c.png)
+
 
 ## Самооценка
 В ДЗ предлагается на основе airflow реализовать описанную выше схему, к деталям:
