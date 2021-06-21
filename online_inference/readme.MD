@@ -1,3 +1,4 @@
+
 PET проект по определению типа территории по GPS координатам и изображению генплана
 
 код  в папке online_inference/kubernetes_manifests
@@ -37,3 +38,7 @@ a) Есть момент времени, когда на кластере ест
 
 Самопроверка 1 (есть за это балл)
 Итого: 5+4+2+3+3+3+1= 21 балл. (или 22 если с баллом за самопроверку)
+
+фото
+![start-k8s](https://user-images.githubusercontent.com/46603429/122819878-ab671200-d2e3-11eb-8bee-3372159ffa01.png)
+![google-cloud](https://user-images.githubusercontent.com/46603429/122819981-c8034a00-d2e3-11eb-8e48-bb38b9f4dc53.png)
